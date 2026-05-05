@@ -33,10 +33,11 @@ export async function POST(req: Request) {
 
     if (!dqUser) return NextResponse.json({ received: true })
 
-    const level = dqUser.dq_levels
+    const level = dqUser.dq_levels as any
+    const referrerId = dqUser.referred_by  // declare BEFORE use
     const ownerCut = Math.floor(amount_ugx * OWNER_CUT)
     const referralBonus = referrerId
-      ? Math.floor(amount_ugx * (level.referral_percent / 100))
+      ? Math.floor(amount_ugx * ((level?.referral_percent || 10) / 100))
       : 0
     const lockedAmount = amount_ugx - ownerCut - referralBonus
 
@@ -53,14 +54,13 @@ export async function POST(req: Request) {
       .eq('reference', reference)
 
     // Pay referral bonus
-    const referrerId = dqUser.referred_by
     if (referrerId && referralBonus > 0) {
       const { data: referrer } = await supabaseAdmin
         .from('dq_users').select('available_balance').eq('id', referrerId).single()
 
       const newBal = (referrer?.available_balance || 0) + referralBonus
       await supabaseAdmin.from('dq_users')
-        .update({ available_balance: newBal, referral_count: supabaseAdmin.rpc('increment_referral', { uid: referrerId }) })
+        .update({ available_balance: newBal })
         .eq('id', referrerId)
 
       await supabaseAdmin.from('dq_transactions').insert({
@@ -69,7 +69,7 @@ export async function POST(req: Request) {
         amount_ugx: referralBonus,
         balance_after: newBal,
         reference: `REF-${reference}`,
-        description: `Referral bonus from new ${level.display_name} member`,
+        description: `Referral bonus from new ${level?.display_name || 'member'}`,
         status: 'completed',
       })
     }
