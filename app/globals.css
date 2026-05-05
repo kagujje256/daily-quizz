@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0a0a0a; color: #fafafa; font-family: 'Inter', sans-serif; }
+
+.glass {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(10px);
+}
+
+.gold { color: #F59E0B; }
+.gold-bg { background: linear-gradient(135deg, #F59E0B, #D97706); }
