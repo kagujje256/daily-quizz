@@ -83,7 +83,7 @@ export default function DashboardPage() {
       })
       const data = await res.json()
       if (res.ok) {
-        setCompletedIds(prev => new Set([...prev, task.id]))
+        setCompletedIds(prev => { const next = new Set(prev); next.add(task.id); return next })
         setProfile(prev => prev ? { ...prev, available_balance: prev.available_balance + task.reward_ugx, total_earned: prev.total_earned + task.reward_ugx } : prev)
         setActiveTask(null)
         setQuizAnswer('')
