@@ -1,4 +1,3 @@
-// MarzPay webhook — handles entry fee payments
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
@@ -27,18 +26,17 @@ export async function POST(req: Request) {
     // Get user + level
     const { data: dqUser } = await supabaseAdmin
       .from('dq_users')
-      .select('*, dq_levels(*)')
+      .select('*, dq_levels(referral_percent, display_name)')
       .eq('id', userId)
       .single()
 
     if (!dqUser) return NextResponse.json({ received: true })
 
     const level = dqUser.dq_levels as any
-    const referrerId = dqUser.referred_by  // declare BEFORE use
+    const referrerId = dqUser.referred_by
     const ownerCut = Math.floor(amount_ugx * OWNER_CUT)
-    const referralBonus = referrerId
-      ? Math.floor(amount_ugx * ((level?.referral_percent || 10) / 100))
-      : 0
+    const referralPercent = level?.referral_percent || 10
+    const referralBonus = referrerId ? Math.floor(amount_ugx * (referralPercent / 100)) : 0
     const lockedAmount = amount_ugx - ownerCut - referralBonus
 
     // Activate user
@@ -56,12 +54,13 @@ export async function POST(req: Request) {
     // Pay referral bonus
     if (referrerId && referralBonus > 0) {
       const { data: referrer } = await supabaseAdmin
-        .from('dq_users').select('available_balance').eq('id', referrerId).single()
+        .from('dq_users').select('available_balance, referral_count').eq('id', referrerId).single()
 
       const newBal = (referrer?.available_balance || 0) + referralBonus
-      await supabaseAdmin.from('dq_users')
-        .update({ available_balance: newBal })
-        .eq('id', referrerId)
+      await supabaseAdmin.from('dq_users').update({
+        available_balance: newBal,
+        referral_count: (referrer?.referral_count || 0) + 1,
+      }).eq('id', referrerId)
 
       await supabaseAdmin.from('dq_transactions').insert({
         user_id: referrerId,
@@ -69,7 +68,7 @@ export async function POST(req: Request) {
         amount_ugx: referralBonus,
         balance_after: newBal,
         reference: `REF-${reference}`,
-        description: `Referral bonus from new ${level?.display_name || 'member'}`,
+        description: `Referral bonus — new ${level?.display_name || 'member'}`,
         status: 'completed',
       })
     }
